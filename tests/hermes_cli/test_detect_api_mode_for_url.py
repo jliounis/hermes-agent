@@ -1,10 +1,11 @@
 """Tests for hermes_cli.runtime_provider._detect_api_mode_for_url.
 
-The helper maps base URLs to api_modes for three cases:
-  * api.openai.com  → codex_responses
-  * api.x.ai        → codex_responses
-  * */anthropic     → anthropic_messages (third-party gateways like MiniMax,
-                                          Zhipu GLM, LiteLLM proxies)
+The helper maps base URLs to api_modes for four cases:
+  * api.openai.com     → codex_responses
+  * api.x.ai           → codex_responses
+  * api.perplexity.ai  → codex_responses (multi-provider Agent API at /v1/responses)
+  * */anthropic        → anthropic_messages (third-party gateways like MiniMax,
+                                             Zhipu GLM, LiteLLM proxies)
 
 Consolidating the /anthropic detection in this helper (instead of three
 inline ``endswith`` checks spread across _resolve_runtime_from_pool_entry,
@@ -36,6 +37,18 @@ class TestCodexResponsesDetection:
 
     def test_xai_host_suffix_does_not_match(self):
         assert _detect_api_mode_for_url("https://api.x.ai.example/v1") is None
+
+    def test_perplexity_api_returns_codex_responses(self):
+        # Perplexity's multi-provider Agent API is exposed at /v1/responses
+        # (OpenAI Responses API alias). Routing through codex_responses is
+        # required for provider/model format strings to work.
+        assert _detect_api_mode_for_url("https://api.perplexity.ai/v1") == "codex_responses"
+
+    def test_perplexity_host_suffix_does_not_match(self):
+        assert _detect_api_mode_for_url("https://api.perplexity.ai.example/v1") is None
+
+    def test_perplexity_path_segment_does_not_match(self):
+        assert _detect_api_mode_for_url("https://proxy.example.test/api.perplexity.ai/v1") is None
 
 
 class TestAnthropicMessagesDetection:

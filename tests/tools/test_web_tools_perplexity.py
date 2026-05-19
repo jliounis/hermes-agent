@@ -90,6 +90,52 @@ class TestPerplexitySearchRequest:
                 with pytest.raises(httpx.HTTPStatusError):
                     _perplexity_search_request({"query": "x"})
 
+    def test_perplexity_api_url_override(self):
+        """PERPLEXITY_API_URL env var redirects /search calls — matches
+        FIRECRAWL_API_URL / TAVILY_BASE_URL pattern for self-hosted or
+        proxied deployments."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"results": []}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.dict(os.environ, {
+            "PERPLEXITY_API_KEY": "pplx-test",
+            "PERPLEXITY_API_URL": "https://proxy.internal.example",
+        }):
+            with patch("tools.web_providers.perplexity.httpx.post", return_value=mock_response) as mock_post:
+                from tools.web_providers.perplexity import _perplexity_search_request
+                _perplexity_search_request({"query": "hi"})
+                args, _ = mock_post.call_args
+                assert args[0] == "https://proxy.internal.example/search"
+
+    def test_perplexity_api_url_strips_trailing_slash(self):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"results": []}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.dict(os.environ, {
+            "PERPLEXITY_API_KEY": "pplx-test",
+            "PERPLEXITY_API_URL": "https://proxy.internal.example/",
+        }):
+            with patch("tools.web_providers.perplexity.httpx.post", return_value=mock_response) as mock_post:
+                from tools.web_providers.perplexity import _perplexity_search_request
+                _perplexity_search_request({"query": "hi"})
+                args, _ = mock_post.call_args
+                assert args[0] == "https://proxy.internal.example/search"
+
+    def test_perplexity_api_url_defaults_when_unset(self):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"results": []}
+        mock_response.raise_for_status = MagicMock()
+
+        with patch.dict(os.environ, {"PERPLEXITY_API_KEY": "pplx-test"}, clear=False):
+            os.environ.pop("PERPLEXITY_API_URL", None)
+            with patch("tools.web_providers.perplexity.httpx.post", return_value=mock_response) as mock_post:
+                from tools.web_providers.perplexity import _perplexity_search_request
+                _perplexity_search_request({"query": "hi"})
+                args, _ = mock_post.call_args
+                assert args[0] == "https://api.perplexity.ai/search"
+
 
 # ─── _normalize_perplexity_results ─────────────────────────────────────────────
 
