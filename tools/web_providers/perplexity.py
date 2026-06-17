@@ -1,6 +1,7 @@
 """Perplexity Search API backend.
 
-Thin search-only client for ``POST https://api.perplexity.ai/search``.
+Thin search-only client for ``POST {PERPLEXITY_API_URL}/search`` (default
+``https://api.perplexity.ai``).
 
 The Perplexity Search API returns full ranked web results (URL + title +
 snippet + content) directly — no LLM in the loop — making it a drop-in
@@ -8,7 +9,10 @@ replacement for Exa, Tavily, Parallel, or Brave for the ``web_search``
 capability.
 
 Auth via ``PERPLEXITY_API_KEY`` (with ``PPLX_API_KEY`` accepted as a
-fallback). Every request carries an ``X-Pplx-Integration: hermes-agent``
+fallback). The API base URL is configurable via ``PERPLEXITY_API_URL``
+(matches the ``FIRECRAWL_API_URL`` / ``TAVILY_BASE_URL`` pattern) so
+self-hosted or proxied deployments can override the endpoint without
+patching code. Every request carries an ``X-Pplx-Integration: hermes-agent``
 header for usage attribution.
 
 This module is search-only by design. ``web_extract`` continues to use the
@@ -29,12 +33,18 @@ from agent.web_search_provider import WebSearchProvider
 logger = logging.getLogger(__name__)
 
 
-_PERPLEXITY_SEARCH_URL = "https://api.perplexity.ai/search"
+_DEFAULT_PERPLEXITY_API_URL = "https://api.perplexity.ai"
 _INTEGRATION_HEADER = "X-Pplx-Integration"
 # Bumping this version on shipped behavior changes lets Perplexity see which
 # Hermes builds are sending traffic.
 _INTEGRATION_VALUE = "hermes-agent/1.0"
 _DEFAULT_TIMEOUT_SECONDS = 30.0
+
+
+def _perplexity_search_url() -> str:
+    """Return the configured Perplexity ``/search`` endpoint URL."""
+    base = (os.getenv("PERPLEXITY_API_URL") or _DEFAULT_PERPLEXITY_API_URL).strip().rstrip("/")
+    return f"{base}/search"
 
 
 def _get_perplexity_api_key() -> str:
@@ -56,7 +66,7 @@ def _perplexity_search_request(payload: Dict[str, Any]) -> Dict[str, Any]:
         _INTEGRATION_HEADER: _INTEGRATION_VALUE,
     }
     response = httpx.post(
-        _PERPLEXITY_SEARCH_URL,
+        _perplexity_search_url(),
         json=payload,
         headers=headers,
         timeout=_DEFAULT_TIMEOUT_SECONDS,

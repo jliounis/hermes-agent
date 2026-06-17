@@ -93,6 +93,14 @@ def _detect_api_mode_for_url(base_url: str) -> Optional[str]:
         return "codex_responses"
     if hostname == "api.openai.com":
         return "codex_responses"
+    if hostname == "api.perplexity.ai":
+        # Perplexity's multi-provider Agent API is exposed via the
+        # OpenAI Responses API alias at /v1/responses. The legacy
+        # /chat/completions endpoint at the same host is Sonar-only and
+        # rejects provider/model-format strings, so route through
+        # Responses by default whenever the resolved base URL points at
+        # Perplexity.
+        return "codex_responses"
     if normalized.endswith("/anthropic"):
         return "anthropic_messages"
     if hostname == "api.kimi.com" and "/coding" in normalized:
